@@ -49,6 +49,36 @@
     },
     "kilos_netos": {
       "regex": ["Kilos\\s*Netos:\\s*([\\d\\.,]+)"]
+    },
+    "kilos_brutos_calidad": {
+      "regex": ["K\\s+I\\s+L\\s+O\\s+S\\s+B\\s+R\\s+U\\s+T\\s+O\\s+S\\s+([\\d\\.,]+)"]
+    },
+    "kilos_netos_calidad": {
+      "regex": ["K\\s+I\\s+L\\s+O\\s+S\\s+N\\s+E\\s+T\\s+O\\s+S\\s+([\\d\\.,]+)"]
+    },
+    "zarandeo_porcentaje": {
+      "regex": ["Zarandeo:\\s*([\\d,]+)\\s*%"]
+    },
+    "humedad_porcentaje": {
+      "regex": ["Humedad:\\s*([\\d,]+%)"]
+    },
+    "humedad_descuento_porcentaje": {
+      "regex": ["Humedad:\\s*[\\d,]+%\\s*([\\d,]+)\\s*%"]
+    },
+    "humedad_descuento_kilos": {
+      "regex": ["Humedad:.*?%\\s*(\\d+)\\s*Secada"]
+    },
+    "volatil_porcentaje": {
+      "regex": ["Vol[áa]til:\\s*([\\d,]+)\\s*%"]
+    },
+    "volatil_descuento_kilos": {
+      "regex": ["Vol[áa]til:.*?%\\s*(\\d+)\\s*Aireacion"]
+    },
+    "aireacion_porcentaje": {
+      "regex": ["Aireaci[óo]n:\\s*([\\d,]+)\\s*%"]
+    },
+    "calidad_porcentaje": {
+      "regex": ["Calidad:\\s*([\\d,]+)\\s*%"]
     }
   }
 }
