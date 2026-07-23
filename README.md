@@ -1,14 +1,26 @@
 # OCR Reader / Extractor de remitos
 
-Herramientas de línea de comandos para OCR sobre imágenes y PDFs, y para
-extraer campos estructurados de remitos escaneados con plantillas
-configurables por proveedor.
+Herramientas de línea de comandos (y una interfaz web) para OCR sobre
+imágenes y PDFs, y para extraer campos estructurados de remitos
+escaneados con plantillas configurables por proveedor.
 
-## Requisitos
+> Guía completa (desarrollo, instalación paso a paso, uso y resolución de
+> problemas): [`DOCUMENTACION.md`](DOCUMENTACION.md).
 
-- Tesseract OCR instalado en el sistema (con los paquetes de idioma que
-  necesites, ej. `tesseract-ocr-spa`).
-- Dependencias de Python: `pip install -r requirements.txt`
+## Instalación
+
+Automática (instala Tesseract, crea un entorno virtual e instala las
+dependencias de Python):
+```bash
+./install.sh
+source venv/bin/activate
+```
+
+Manual: Tesseract OCR debe estar instalado en el sistema (ej.
+`sudo apt-get install tesseract-ocr tesseract-ocr-spa` en Ubuntu/Debian, o
+`brew install tesseract tesseract-lang` en macOS), y las dependencias de
+Python con `pip install -r requirements.txt`. Ver el paso a paso completo
+en [`DOCUMENTACION.md`](DOCUMENTACION.md#4-instalación-paso-a-paso).
 
 ## `ocr_reader.py` — OCR genérico
 
@@ -120,4 +132,6 @@ providers/             Plantillas de proveedores (una por archivo .json)
 webapp/                Interfaz gráfica (Flask) para configurar plantillas
   app.py                 Backend: subida de PDF, OCR, guardado/prueba de plantillas
   templates/, static/    Frontend (HTML/CSS/JS, sin dependencias externas)
+install.sh             Instalación automática (Tesseract + entorno virtual + dependencias)
+DOCUMENTACION.md       Documentación completa (desarrollo, instalación, uso, troubleshooting)
 ```
