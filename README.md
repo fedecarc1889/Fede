@@ -47,7 +47,9 @@ extracción (regex, o región fija de la página) se definen por separado en
   como plantilla de respaldo con reglas genéricas.
 
 También se puede elegir qué campos extraer con `-f/--fields` (selector de
-campos), en vez de extraer todos los definidos en la plantilla.
+campos), en vez de extraer todos los definidos en la plantilla. Y además
+de un PDF individual, `input` puede ser una **carpeta** con varios
+remitos (de uno o varios proveedores) para procesarlos todos juntos.
 
 ```
 # Detección automática de proveedor, todos los campos de su plantilla
@@ -62,6 +64,9 @@ python3 remito_extractor.py remito.pdf -f numero_remito,fecha,cliente
 # Guardar el resultado en JSON
 python3 remito_extractor.py remito.pdf -o resultado.json
 
+# Procesar una carpeta entera y consolidar todo en un Excel
+python3 remito_extractor.py ./carpeta_remitos -o resultados.xlsx
+
 # Ver qué proveedores hay disponibles
 python3 remito_extractor.py --list-providers
 
@@ -69,7 +74,7 @@ python3 remito_extractor.py --list-providers
 python3 remito_extractor.py --list-fields -p acme_sa
 ```
 
-La salida es JSON:
+Por defecto la salida es JSON:
 
 ```json
 {
@@ -85,6 +90,19 @@ La salida es JSON:
 
 Un valor `null` significa que ninguna regla de ese campo encontró una
 coincidencia en el documento (probablemente hay que ajustar la plantilla).
+
+### Exportar a Excel
+
+Si `-o` termina en `.xlsx` (o `.xls`), en vez de JSON se genera una
+planilla Excel con **una fila por remito** y **una columna por campo**
+(unión de los campos de todos los proveedores procesados, con `archivo` y
+`proveedor` como primeras columnas). Sirve tanto para un único PDF como
+para una carpeta entera con remitos de distintos proveedores:
+
+```
+python3 remito_extractor.py remito.pdf -o remito.xlsx
+python3 remito_extractor.py ./carpeta_remitos -o resultados.xlsx
+```
 
 ### Agregar un proveedor nuevo
 
@@ -115,7 +133,7 @@ Permite:
   de la página para campos en una posición fija (sellos, numeración
   pre-impresa).
 - Probar la extracción completa de la plantilla contra el PDF de ejemplo
-  antes de guardar.
+  antes de guardar, y **descargarla como Excel** con un botón.
 - Guardar, lo que escribe/actualiza `providers/<id>.json` — el mismo
   archivo que usa `remito_extractor.py` por línea de comandos.
 

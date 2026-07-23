@@ -372,3 +372,37 @@ $("#extractAllBtn").addEventListener("click", async () => {
     box.textContent = `Error: ${e.message}`;
   }
 });
+
+$("#downloadExcelBtn").addEventListener("click", async () => {
+  const saveStatus = $("#saveStatus");
+  if (!sessionId) {
+    alert("Subí un PDF de ejemplo primero.");
+    return;
+  }
+  try {
+    const res = await fetch("/extract-all/excel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        provider_id: providerId.value.trim() || undefined,
+        fields: gatherFields(),
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.description || `Error ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "remito.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    saveStatus.textContent = `Error al generar el Excel: ${e.message}`;
+  }
+});

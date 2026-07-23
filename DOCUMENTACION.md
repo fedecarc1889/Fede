@@ -74,6 +74,26 @@ CLI que:
 Comandos de exploración: `--list-providers` (qué plantillas hay) y
 `--list-fields -p <id>` (qué campos define una plantilla puntual).
 
+`input` también puede ser una **carpeta**: en ese caso se procesan todos
+los `.pdf` que contenga (de uno o varios proveedores, cada uno detectado
+o resuelto por separado) y el resultado es una lista de resultados en vez
+de uno solo. Si un archivo falla (OCR roto, proveedor no encontrado), no
+frena al resto: ese resultado queda con una clave `"error"` y se sigue con
+los demás.
+
+### Exportación a Excel
+
+Si `-o` termina en `.xlsx`/`.xls`, en vez de JSON se genera un libro de
+Excel (`write_excel()`, con `openpyxl`) con **una fila por remito
+procesado** y **una columna por campo**. Las columnas son la unión de
+todos los campos vistos en todos los resultados (útil cuando la carpeta
+mezcla remitos de proveedores distintos, con campos distintos: los que no
+aplican a un remito puntual quedan en blanco en esa fila), con `archivo` y
+`proveedor` siempre como primeras columnas, encabezado en negrita y ancho
+de columna ajustado al contenido. Sirve tanto para un PDF individual como
+para una carpeta entera — es la forma recomendada de consolidar muchos
+remitos en una sola planilla ordenada.
+
 ### Etapa 4 — Plantillas de proveedor (`providers/`)
 
 Cada plantilla es un archivo `providers/<id>.json`:
@@ -122,7 +142,11 @@ Miniapp Flask para crear y editar plantillas sin tocar JSON a mano:
   campo `bbox`), y guardar todo con un botón.
 
 Reutiliza directamente `ocr_core` y `remito_extractor` (los importa desde
-la raíz del repo) — no duplica ninguna lógica de OCR ni de extracción.
+la raíz del repo) — no duplica ninguna lógica de OCR ni de extracción,
+incluyendo `write_excel()`: el botón **"Descargar como Excel"** llama al
+endpoint `POST /extract-all/excel`, que corre la extracción sobre la
+sesión activa y devuelve un `.xlsx` de una fila descargable, generado con
+la misma función que usa el modo carpeta del CLI.
 
 ### Etapa 6 — Instalación simplificada
 
@@ -247,12 +271,16 @@ python3 remito_extractor.py remito.pdf -f numero_remito,fecha,cliente
 # guardar el resultado en JSON
 python3 remito_extractor.py remito.pdf -o resultado.json
 
+# procesar una carpeta con varios remitos (de uno o varios proveedores)
+# y consolidar todo en un Excel: una fila por remito, una columna por campo
+python3 remito_extractor.py ./carpeta_remitos -o resultados.xlsx
+
 # explorar plantillas disponibles
 python3 remito_extractor.py --list-providers
 python3 remito_extractor.py --list-fields -p proveedor_ejemplo
 ```
 
-Salida:
+Salida por defecto (JSON):
 ```json
 {
   "archivo": "remito.pdf",
@@ -264,6 +292,13 @@ Salida:
   }
 }
 ```
+
+Con `-o resultados.xlsx` (o `.xls`), en cambio, se genera una planilla con
+una fila por PDF procesado y una columna por cada campo encontrado en
+cualquiera de las plantillas usadas (las celdas que no aplican a un
+remito puntual quedan vacías). Al procesar una carpeta, si algún PDF falla
+(no se pudo hacer OCR, o no se detectó proveedor y no hay `generic`), esa
+fila queda con una columna `error` en vez de frenar el resto del lote.
 
 ### 5.3. Interfaz gráfica (`webapp/`)
 
@@ -289,12 +324,18 @@ Flujo típico para dar de alta un proveedor nuevo:
      arrastrar el mouse sobre la zona de la página donde está el dato
      (útil para sellos o numeración impresa que la regex no capta bien).
 5. **"Probar extracción completa"** para ver el JSON final con todos los
-   campos antes de guardar.
+   campos antes de guardar, o **"Descargar como Excel"** para bajar ese
+   mismo resultado como una planilla `.xlsx` de una fila (útil para
+   revisar rápido el formato de salida sin usar la línea de comandos).
 6. **"Guardar plantilla"** → se escribe/actualiza `providers/<id>.json`.
 
 A partir de ahí, ese proveedor queda disponible tanto en la interfaz
 gráfica como en `remito_extractor.py` (por `-p <id>` o por detección
-automática si sus `match` coinciden con un remito nuevo).
+automática si sus `match` coinciden con un remito nuevo). Para consolidar
+**muchos** remitos en una sola planilla, usar el modo carpeta del CLI
+(`remito_extractor.py ./carpeta_remitos -o resultados.xlsx`) — la
+interfaz gráfica solo procesa un PDF de ejemplo a la vez, pensada para
+diseñar y probar plantillas, no para el procesamiento masivo.
 
 ---
 

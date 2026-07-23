@@ -58,6 +58,11 @@ def _valid_provider_id(provider_id: str) -> bool:
     return bool(re.fullmatch(r"[a-zA-Z0-9_\-]+", provider_id or ""))
 
 
+@app.get("/favicon.ico")
+def favicon():
+    return "", 204
+
+
 @app.get("/")
 def index():
     providers = remito_extractor.load_providers(PROVIDERS_DIR)
@@ -87,6 +92,7 @@ def upload():
         "pages_text": pages_text,
         "lang": lang,
         "num_pages": len(pages_text),
+        "original_name": file.filename,
     }
 
     providers = remito_extractor.load_providers(PROVIDERS_DIR)
@@ -209,6 +215,47 @@ def extract_all():
         session["pdf_path"], session["pages_text"], cfg, session["lang"]
     )
     return jsonify({"campos": result})
+
+
+@app.post("/extract-all/excel")
+def extract_all_excel():
+    """Igual que /extract-all, pero devuelve el resultado como un Excel de
+    una fila descargable, para tener 'la salida en Excel' sin pasar por la
+    línea de comandos."""
+    body = request.get_json(force=True, silent=False) or {}
+    session = _session_or_404(body.get("session_id"))
+
+    provider_id = body.get("provider_id")
+    fields = body.get("fields")
+
+    if fields is not None:
+        cfg = {"fields": fields}
+    elif provider_id:
+        providers = remito_extractor.load_providers(PROVIDERS_DIR)
+        cfg = providers.get(provider_id)
+        if not cfg:
+            abort(404, f"Proveedor '{provider_id}' no encontrado.")
+    else:
+        abort(400, "Falta 'provider_id' o 'fields'.")
+
+    campos = remito_extractor.extract_fields(
+        session["pdf_path"], session["pages_text"], cfg, session["lang"]
+    )
+    row = {
+        "archivo": session.get("original_name") or session["pdf_path"].name,
+        "proveedor": provider_id or "(borrador)",
+        "campos": campos,
+    }
+
+    excel_path = session["pdf_path"].parent / "extraccion.xlsx"
+    remito_extractor.write_excel([row], excel_path)
+
+    return send_file(
+        excel_path,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name="remito.xlsx",
+    )
 
 
 if __name__ == "__main__":

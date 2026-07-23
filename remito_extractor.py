@@ -8,11 +8,16 @@ fija de la página). La plantilla se puede seleccionar manualmente
 (-p/--provider) o detectar automáticamente a partir de marcadores de texto
 propios de cada proveedor.
 
+También acepta una carpeta con varios PDFs (de proveedores iguales o
+distintos) y puede exportar el resultado consolidado a Excel, con una
+fila por remito y una columna por campo.
+
 Uso:
     python3 remito_extractor.py remito.pdf
     python3 remito_extractor.py remito.pdf -p acme_sa
     python3 remito_extractor.py remito.pdf -f numero_remito,fecha,cliente
     python3 remito_extractor.py remito.pdf -o resultado.json
+    python3 remito_extractor.py ./carpeta_remitos -o resultados.xlsx
     python3 remito_extractor.py --list-providers
     python3 remito_extractor.py --list-fields -p acme_sa
 """
@@ -107,6 +112,92 @@ def extract_fields(
     return result
 
 
+def process_pdf(
+    pdf_path: Path,
+    providers: dict[str, dict],
+    provider_override: str | None,
+    lang: str,
+    fields_filter: set[str] | None,
+) -> dict:
+    """Corre OCR + extracción de campos sobre un PDF. Nunca levanta
+    excepciones: los errores quedan en el resultado bajo la clave 'error',
+    para que el modo carpeta pueda seguir con los demás archivos."""
+    try:
+        pages_text = ocr_core.ocr_pdf_pages(pdf_path, lang)
+    except RuntimeError as e:
+        return {"archivo": pdf_path.name, "error": str(e)}
+
+    full_text = "\n".join(pages_text)
+
+    provider_id = provider_override
+    if provider_id:
+        if provider_id not in providers:
+            return {"archivo": pdf_path.name, "error": f"Proveedor '{provider_id}' no encontrado."}
+    else:
+        detected = detect_provider(full_text, providers)
+        if detected:
+            provider_id = detected
+            print(f"{pdf_path.name}: proveedor detectado automáticamente -> {provider_id}", file=sys.stderr)
+        elif "generic" in providers:
+            provider_id = "generic"
+            print(f"{pdf_path.name}: no se detectó proveedor, usando plantilla genérica.", file=sys.stderr)
+        else:
+            return {
+                "archivo": pdf_path.name,
+                "error": "No se detectó proveedor y no hay plantilla 'generic'. Usa -p/--provider.",
+            }
+
+    campos = extract_fields(pdf_path, pages_text, providers[provider_id], lang, fields_filter)
+    return {"archivo": pdf_path.name, "proveedor": provider_id, "campos": campos}
+
+
+def write_excel(results: list[dict], path: Path) -> None:
+    """Escribe los resultados como una fila por remito, con una columna por
+    campo (unión de todos los campos vistos, en el orden en que aparecen)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    columns = ["archivo", "proveedor"]
+    seen = set(columns)
+    for r in results:
+        for key in r.get("campos", {}):
+            if key not in seen:
+                seen.add(key)
+                columns.append(key)
+    if any("error" in r for r in results):
+        columns.append("error")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Remitos"
+    ws.append(columns)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for r in results:
+        campos = r.get("campos", {})
+        row = []
+        for col in columns:
+            if col == "archivo":
+                row.append(r.get("archivo"))
+            elif col == "proveedor":
+                row.append(r.get("proveedor"))
+            elif col == "error":
+                row.append(r.get("error"))
+            else:
+                row.append(campos.get(col))
+        ws.append(row)
+
+    for i, col in enumerate(columns, start=1):
+        cell_values = [str(ws.cell(row=r, column=i).value or "") for r in range(2, ws.max_row + 1)]
+        width = max([len(col)] + [len(v) for v in cell_values]) + 2
+        ws.column_dimensions[get_column_letter(i)].width = min(width, 50)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(path)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Extractor dinámico de campos de remitos en PDF, con "
@@ -118,6 +209,7 @@ Ejemplos:
   python3 remito_extractor.py remito.pdf -p acme_sa
   python3 remito_extractor.py remito.pdf -f numero_remito,fecha,cliente
   python3 remito_extractor.py remito.pdf -o resultado.json
+  python3 remito_extractor.py ./carpeta_remitos -o resultados.xlsx
   python3 remito_extractor.py --list-providers
   python3 remito_extractor.py --list-fields -p acme_sa
 
@@ -125,7 +217,7 @@ Ver providers/README.md para el esquema de las plantillas y cómo agregar
 un nuevo proveedor.
         """,
     )
-    parser.add_argument("input", nargs="?", help="PDF del remito a procesar")
+    parser.add_argument("input", nargs="?", help="PDF del remito a procesar, o una carpeta con varios PDFs")
     parser.add_argument(
         "-p", "--provider",
         help="ID de la plantilla de proveedor a usar (ver --list-providers). "
@@ -137,7 +229,12 @@ un nuevo proveedor.
         "definidos en la plantilla). Ver --list-fields.",
     )
     parser.add_argument("-l", "--lang", default="spa", help="Idioma OCR (default: spa)")
-    parser.add_argument("-o", "--output", help="Archivo de salida (JSON)")
+    parser.add_argument(
+        "-o", "--output",
+        help="Archivo de salida. Formato según la extensión: .xlsx/.xls para "
+        "Excel (una fila por remito, una columna por campo), cualquier otra "
+        "para JSON.",
+    )
     parser.add_argument(
         "--providers-dir",
         help=f"Directorio con plantillas de proveedores (default: {PROVIDERS_DIR})",
@@ -175,52 +272,46 @@ un nuevo proveedor.
         return
 
     if not args.input:
-        parser.error("falta el archivo PDF de entrada")
+        parser.error("falta el archivo PDF de entrada (o una carpeta con varios PDFs)")
 
-    pdf_path = Path(args.input)
-    if not pdf_path.exists():
-        print(f"ERROR: '{pdf_path}' no existe.", file=sys.stderr)
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(f"ERROR: '{input_path}' no existe.", file=sys.stderr)
         sys.exit(1)
 
-    try:
-        pages_text = ocr_core.ocr_pdf_pages(pdf_path, args.lang)
-    except RuntimeError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+    if args.provider and args.provider not in providers:
+        print(f"ERROR: proveedor '{args.provider}' no encontrado. Usa --list-providers.", file=sys.stderr)
         sys.exit(1)
 
-    full_text = "\n".join(pages_text)
-
-    provider_id = args.provider
-    if provider_id:
-        if provider_id not in providers:
-            print(f"ERROR: proveedor '{provider_id}' no encontrado. Usa --list-providers.", file=sys.stderr)
-            sys.exit(1)
-    else:
-        provider_id = detect_provider(full_text, providers)
-        if provider_id:
-            print(f"Proveedor detectado automáticamente: {provider_id}", file=sys.stderr)
-        elif "generic" in providers:
-            provider_id = "generic"
-            print("No se detectó un proveedor conocido, usando plantilla genérica.", file=sys.stderr)
-        else:
-            print("ERROR: no se detectó proveedor y no hay plantilla 'generic'. Usa -p/--provider.", file=sys.stderr)
-            sys.exit(1)
-
-    provider_cfg = providers[provider_id]
     fields_filter = set(f.strip() for f in args.fields.split(",")) if args.fields else None
 
-    campos = extract_fields(pdf_path, pages_text, provider_cfg, args.lang, fields_filter)
+    is_batch = input_path.is_dir()
+    if is_batch:
+        pdf_files = sorted(f for f in input_path.iterdir() if f.suffix.lower() == ".pdf")
+        if not pdf_files:
+            print(f"No se encontraron PDFs en '{input_path}'.", file=sys.stderr)
+            return
+        results = [process_pdf(p, providers, args.provider, args.lang, fields_filter) for p in pdf_files]
+    else:
+        result = process_pdf(input_path, providers, args.provider, args.lang, fields_filter)
+        if "error" in result:
+            print(f"ERROR: {result['error']}", file=sys.stderr)
+            sys.exit(1)
+        results = [result]
 
-    output = {
-        "archivo": pdf_path.name,
-        "proveedor": provider_id,
-        "campos": campos,
-    }
-    text_out = json.dumps(output, ensure_ascii=False, indent=2)
+    output_path = Path(args.output) if args.output else None
 
-    if args.output:
-        Path(args.output).write_text(text_out, encoding="utf-8")
-        print(f"Resultado guardado en: {args.output}")
+    if output_path and output_path.suffix.lower() in (".xlsx", ".xls"):
+        write_excel(results, output_path)
+        print(f"Excel guardado en: {output_path}")
+        return
+
+    payload = results if is_batch else results[0]
+    text_out = json.dumps(payload, ensure_ascii=False, indent=2)
+
+    if output_path:
+        output_path.write_text(text_out, encoding="utf-8")
+        print(f"Resultado guardado en: {output_path}")
     else:
         print(text_out)
 
