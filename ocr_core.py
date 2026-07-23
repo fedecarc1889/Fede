@@ -57,6 +57,64 @@ def ocr_pdf_pages(
         doc.close()
 
 
+def _reconstruct_reading_order(words: list[tuple], y_tolerance: float = 3.0) -> str:
+    """Reordena palabras de page.get_text('words') en filas por proximidad
+    vertical, ordenadas de izquierda a derecha dentro de cada fila.
+
+    Necesario porque en comprobantes con layout de tabla/formulario el orden
+    crudo del contenido del PDF suele agrupar primero todas las etiquetas de
+    una sección y recién después todos los valores (ej. "Remitente: Domicilio:
+    CUIT: ACME CalleFalsa123 30-11111111-1"), en vez de seguir el orden visual
+    de lectura fila por fila.
+    """
+    if not words:
+        return ""
+    ordered = sorted(words, key=lambda w: (w[1], w[0]))
+    lines: list[list[tuple]] = [[ordered[0]]]
+    for w in ordered[1:]:
+        if abs(w[1] - lines[-1][-1][1]) <= y_tolerance:
+            lines[-1].append(w)
+        else:
+            lines.append([w])
+    return "\n".join(
+        " ".join(w[4] for w in sorted(line, key=lambda w: w[0]))
+        for line in lines
+    )
+
+
+def get_pdf_pages_text(
+    path: Path,
+    lang: str = "spa",
+    zoom: float = 2.0,
+    y_tolerance: float = 3.0,
+) -> list[str]:
+    """Extrae el texto de cada página de un PDF de la forma más confiable
+    posible: si la página tiene texto embebido (PDF "nativo", no escaneado),
+    lo usa reconstruyendo el orden de lectura por filas (ver
+    `_reconstruct_reading_order`) — más preciso y sin errores de
+    reconocimiento que el OCR. Solo recurre a Tesseract sobre la página
+    renderizada cuando no hay texto embebido (páginas escaneadas como
+    imagen)."""
+    try:
+        import fitz  # pymupdf
+    except ImportError as exc:
+        raise RuntimeError("pymupdf no instalado. Ejecuta: pip install pymupdf") from exc
+
+    doc = fitz.open(path)
+    try:
+        texts = []
+        for i, page in enumerate(doc):
+            words = page.get_text("words")
+            if words:
+                texts.append(_reconstruct_reading_order(words, y_tolerance))
+            else:
+                img = render_pdf_page(doc, i, zoom)
+                texts.append(ocr_image(img, lang))
+        return texts
+    finally:
+        doc.close()
+
+
 def ocr_pdf(path: Path, lang: str = "spa", zoom: float = 2.0) -> str:
     """OCR de un PDF completo, con separadores de página, como un único string."""
     texts = ocr_pdf_pages(path, lang, zoom)

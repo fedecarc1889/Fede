@@ -1,0 +1,54 @@
+{
+  "label": "CARGILL - Comprobante de Acondicionamiento",
+  "match": [
+    "Comprobantes\\s+de\\s+Acondicionamiento",
+    "CARGILL"
+  ],
+  "fields": {
+    "numero": {
+      "regex": ["N[uú]mero:\\s*(\\S+)"]
+    },
+    "fecha": {
+      "regex": ["Fecha\\s*(\\d{1,2}/\\d{1,2}/\\d{2,4})"]
+    },
+    "remitente": {
+      "regex": ["Remitente:\\s*(.+?)\\s*CUIT:"]
+    },
+    "cuit_remitente": {
+      "regex": ["Remitente:.*?CUIT:\\s*([\\d\\-]+)"]
+    },
+    "domicilio": {
+      "regex": ["Domicilio:\\s*(.+?)\\s*Localidad:"]
+    },
+    "localidad": {
+      "regex": ["Localidad:\\s*(\\S+)"]
+    },
+    "transporte": {
+      "regex": ["Transporte:\\s*(.+?)\\s*CUIT:"]
+    },
+    "cuit_transportista": {
+      "regex": ["Transporte:.*?CUIT:\\s*([\\d\\-]+)"]
+    },
+    "chofer": {
+      "regex": ["Chofer:\\s*(.+?)\\s*CUIL"]
+    },
+    "patente_chasis": {
+      "regex": ["Pat\\.\\s*Chasis:\\s*(.+?)\\s*Pat\\.\\s*Acoplado:"]
+    },
+    "patente_acoplado": {
+      "regex": ["Pat\\.\\s*Acoplado:\\s*(.+?)\\s*Kilos"]
+    },
+    "producto": {
+      "regex": ["Producto:\\s*(.+?)\\s*Compbte"]
+    },
+    "kilos_brutos": {
+      "regex": ["Kilos\\s*Brutos:\\s*([\\d\\.,]+)"]
+    },
+    "kilos_tara": {
+      "regex": ["Kilos\\s*Tara:\\s*([\\d\\.,]+)"]
+    },
+    "kilos_netos": {
+      "regex": ["Kilos\\s*Netos:\\s*([\\d\\.,]+)"]
+    }
+  }
+}

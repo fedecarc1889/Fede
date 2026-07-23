@@ -123,7 +123,7 @@ def process_pdf(
     excepciones: los errores quedan en el resultado bajo la clave 'error',
     para que el modo carpeta pueda seguir con los demás archivos."""
     try:
-        pages_text = ocr_core.ocr_pdf_pages(pdf_path, lang)
+        pages_text = ocr_core.get_pdf_pages_text(pdf_path, lang)
     except RuntimeError as e:
         return {"archivo": pdf_path.name, "error": str(e)}
 

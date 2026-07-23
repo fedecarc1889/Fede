@@ -50,11 +50,16 @@ compartan sin duplicar código. Expone:
   Es la pieza que permite leer campos en una posición fija del formulario
   (sellos, numeración pre-impresa) cuando una regex sobre el texto
   completo no es confiable.
+- `get_pdf_pages_text(path, lang, zoom, y_tolerance)` — extracción híbrida
+  (agregada más adelante, ver etapa 7): usa el texto embebido del PDF
+  cuando existe, y solo cae a OCR con Tesseract si la página no tiene
+  texto (escaneo real). Es la que usan `remito_extractor.py` y la
+  interfaz web para obtener el texto sobre el que corren las regex.
 
 ### Etapa 3 — Extractor dinámico de campos (`remito_extractor.py`)
 
 CLI que:
-1. Corre OCR sobre el PDF de entrada (reutilizando `ocr_core`).
+1. Extrae el texto del PDF de entrada (reutilizando `ocr_core`).
 2. Determina qué **plantilla de proveedor** usar:
    - **Automáticamente**, comparando el texto OCR contra los marcadores
      regex (`match`) definidos en cada plantilla — gana la plantilla con
@@ -154,22 +159,69 @@ la misma función que usa el modo carpeta del CLI.
 `brew`), crea un entorno virtual de Python en `./venv` e instala
 `requirements.txt`.
 
+### Etapa 7 — Exportación a Excel y modo carpeta
+
+`remito_extractor.py` ahora acepta una **carpeta** además de un PDF
+individual (procesa todos los `.pdf` que contenga, cada uno con su propio
+proveedor detectado o resuelto). Si `-o` termina en `.xlsx`/`.xls`, en vez
+de JSON se genera un libro de Excel (`write_excel()`, con `openpyxl`) con
+una fila por remito y una columna por campo — unión de todos los campos
+vistos en todos los proveedores procesados, con `archivo` y `proveedor`
+como primeras columnas. La interfaz web suma el mismo resultado con un
+botón **"Descargar como Excel"** (`POST /extract-all/excel`), que arma un
+`.xlsx` de una fila con la sesión activa.
+
+### Etapa 8 — Extracción híbrida de texto (nativo + OCR)
+
+Se detectó, con un remito real (un comprobante de acondicionamiento de
+CARGILL), que muchos PDFs "de remito" no son escaneos sino **PDFs
+nativos con texto embebido** — generados por un sistema, no fotografiados.
+Correr Tesseract sobre la imagen renderizada de esos PDFs es innecesario y
+además introduce errores de reconocimiento que un PDF nativo no tiene
+(ej. "N°" leído como "N*", comas confundidas con puntos en montos, etc.).
+
+Pero además, extraer el texto embebido de forma cruda
+(`page.get_text()` de PyMuPDF) tampoco alcanza: en comprobantes con
+layout de tabla/formulario, el orden del contenido del PDF suele agrupar
+primero **todas las etiquetas** de una sección y recién después **todos
+los valores** (ej. "Remitente: Domicilio: CUIT: ACME CalleFalsa123
+30-11111111-1"), rompiendo cualquier regex tipo "Etiqueta: valor" que
+espere que el valor venga justo después de su etiqueta.
+
+La solución, en `ocr_core.get_pdf_pages_text()`:
+1. Para cada página, pide las palabras con sus coordenadas
+   (`page.get_text("words")`).
+2. Si la página tiene palabras (PDF nativo), las reconstruye en **orden
+   de lectura real**: las agrupa en filas por proximidad vertical
+   (`_reconstruct_reading_order()`, tolerancia configurable) y ordena
+   cada fila de izquierda a derecha — así "Remitente:" y su valor quedan
+   en la misma línea, en el orden en que se ven visualmente.
+3. Si la página no tiene palabras (es una imagen escaneada sin texto),
+   recién ahí renderiza la página y corre Tesseract, como antes.
+
+`remito_extractor.py` y `webapp/app.py` usan `get_pdf_pages_text()` en vez
+de `ocr_pdf_pages()` para obtener el texto sobre el que corren las regex
+(el OCR de regiones `bbox` puntuales sigue igual, vía
+`ocr_pdf_region()`). `ocr_reader.py` no se tocó: sigue haciendo OCR
+"real" siempre, porque su función es específicamente esa.
+
 ---
 
 ## 3. Estructura de archivos
 
 ```
-ocr_core.py             Núcleo de OCR compartido (render de páginas PDF, OCR de imagen/región)
+ocr_core.py             Núcleo de extracción compartido (texto nativo + OCR, render de páginas, OCR de región)
 ocr_reader.py            CLI de OCR genérico (texto plano de imágenes/PDFs)
-remito_extractor.py      CLI de extracción de campos por plantilla de proveedor
+remito_extractor.py      CLI de extracción de campos por plantilla de proveedor (archivo o carpeta, JSON o Excel)
 providers/               Plantillas de proveedores (una por archivo .json)
   generic.json             Plantilla de respaldo con reglas genéricas
   proveedor_ejemplo.json   Ejemplo de plantilla con regex y campo bbox
+  cargill_acondicionamiento.json  Plantilla real (comprobante de acondicionamiento de granos)
   README.md                Esquema de las plantillas
 webapp/                  Interfaz gráfica (Flask) para configurar plantillas
-  app.py                    Backend: subida de PDF, OCR, guardado/prueba de plantillas
+  app.py                    Backend: subida de PDF, extracción, guardado/prueba de plantillas, descarga de Excel
   templates/index.html      Estructura de la página
-  static/app.js             Lógica de la interfaz (subida, canvas de bbox, tests, guardado)
+  static/app.js             Lógica de la interfaz (subida, canvas de bbox, tests, guardado, descarga)
   static/style.css          Estilos
 install.sh               Script de instalación automática
 requirements.txt         Dependencias de Python

@@ -83,7 +83,7 @@ def upload():
     file.save(pdf_path)
 
     try:
-        pages_text = ocr_core.ocr_pdf_pages(pdf_path, lang)
+        pages_text = ocr_core.get_pdf_pages_text(pdf_path, lang)
     except RuntimeError as e:
         abort(500, str(e))
 
