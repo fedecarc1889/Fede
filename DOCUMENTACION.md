@@ -205,6 +205,48 @@ de `ocr_pdf_pages()` para obtener el texto sobre el que corren las regex
 `ocr_pdf_region()`). `ocr_reader.py` no se tocó: sigue haciendo OCR
 "real" siempre, porque su función es específicamente esa.
 
+### Etapa 9 — Sugerencia automática de plantillas (`suggest_fields()`)
+
+Armar una plantilla nueva a mano (una regex por campo) es el paso más
+lento del flujo. `remito_extractor.suggest_fields(pages_text)` genera un
+**borrador** analizando el texto (ya en orden de lectura) en busca de
+pares "Etiqueta: valor":
+
+1. Por cada línea, separa tokens (palabras) y ubica los que terminan en
+   `:` — esas son las "anclas" de etiqueta. Trabajar a nivel de palabra
+   (no con una regex de mayúsculas sobre la línea completa) es clave:
+   una heurística basada en "palabra en mayúsculas = etiqueta" falla
+   feo en remitos reales, porque razones sociales y nombres propios
+   también vienen en mayúsculas (ej. confundía "CARGILL S.A.C.I.
+   FEED/SOYBEANS" -- el *valor* de "Remitente:" -- con parte de la
+   siguiente etiqueta).
+2. Etiquetas de dos palabras (ej. "Pat. Chasis:", "Kilos Brutos:") se
+   arman mirando si la palabra anterior a la ancla es un calificador
+   corto y no está en mayúsculas (`_is_label_qualifier()`) — así no
+   confunde "Kilos" (calificador) con "SCHIAVONI" o "SAS" (valores en
+   mayúsculas que casualmente preceden a una etiqueta).
+3. El valor de cada campo es el texto entre su etiqueta y la siguiente
+   ancla de la misma línea (o el resto de la línea si es la última). La
+   regex generada usa `\b` antes de la etiqueta para no matchear como
+   substring (ej. sin ese límite, `Calidad:` matcheaba dentro de
+   `Localidad:`, capturando el valor equivocado — bug real encontrado al
+   validar contra el remito de CARGILL).
+4. Etiquetas repetidas (ej. "CUIT:" de remitente y de transportista)
+   quedan numeradas (`cuit`, `cuit_2`) — hay que revisarlas y renombrarlas.
+
+Es explícitamente un **borrador para revisar**, no un resultado
+definitivo: en tablas de dos columnas donde la etiqueta de la columna
+vecina no tiene ':' pegado a la palabra (ej. "Paritaria (P) :", con un
+espacio antes de los dos puntos), el campo de la izquierda puede
+arrastrar texto de esa columna. Validado contra el remito real de
+CARGILL: de 29 campos sugeridos, 21 salieron perfectos sin ajuste.
+
+Expuesto en dos lugares:
+- CLI: `python3 remito_extractor.py remito.pdf --suggest-template -o providers/nuevo.json`
+- Interfaz web: botón **"Sugerir campos automáticamente"**, que llama a
+  `POST /suggest-fields` y agrega una fila de campo por cada sugerencia
+  para revisar/probar/ajustar antes de guardar.
+
 ---
 
 ## 3. Estructura de archivos
@@ -212,7 +254,7 @@ de `ocr_pdf_pages()` para obtener el texto sobre el que corren las regex
 ```
 ocr_core.py             Núcleo de extracción compartido (texto nativo + OCR, render de páginas, OCR de región)
 ocr_reader.py            CLI de OCR genérico (texto plano de imágenes/PDFs)
-remito_extractor.py      CLI de extracción de campos por plantilla de proveedor (archivo o carpeta, JSON o Excel)
+remito_extractor.py      CLI de extracción de campos (archivo o carpeta, JSON o Excel) y de sugerencia de plantillas (--suggest-template)
 providers/               Plantillas de proveedores (una por archivo .json)
   generic.json             Plantilla de respaldo con reglas genéricas
   proveedor_ejemplo.json   Ejemplo de plantilla con regex y campo bbox
@@ -352,6 +394,22 @@ remito puntual quedan vacías). Al procesar una carpeta, si algún PDF falla
 (no se pudo hacer OCR, o no se detectó proveedor y no hay `generic`), esa
 fila queda con una columna `error` en vez de frenar el resto del lote.
 
+#### Generar un borrador de plantilla automáticamente
+
+En vez de escribir cada regex a mano, `--suggest-template` analiza un PDF
+de ejemplo y propone un borrador (ver etapa 9 en la sección 2):
+
+```bash
+python3 remito_extractor.py remito_nuevo.pdf --suggest-template -o providers/proveedor_nuevo.json
+```
+
+Genera `providers/proveedor_nuevo.json` con `"match": []` (hay que
+completarlo) y un campo por cada "Etiqueta: valor" detectado. Es un punto
+de partida: conviene revisar los nombres numerados (`cuit`, `cuit_2`,
+...) porque la misma etiqueta se repite, y probar cada campo con
+`--list-fields -p proveedor_nuevo` o directamente corriendo la
+extracción, para ajustar los que hayan arrastrado texto de más.
+
 ### 5.3. Interfaz gráfica (`webapp/`)
 
 ```bash
@@ -368,7 +426,13 @@ Flujo típico para dar de alta un proveedor nuevo:
    **nombre visible** y, opcionalmente, **marcadores de detección
    automática** (regex que identifiquen al proveedor en su texto OCR, ej.
    su razón social o CUIT).
-4. Por cada campo: **"+ Agregar campo"**, ponerle un nombre, y elegir:
+4. **"Sugerir campos automáticamente"** agrega de entrada un campo (con
+   su regex) por cada "Etiqueta: valor" que detecta en el PDF — no hace
+   falta partir de cero. Es un borrador: conviene revisar los nombres
+   numerados (misma etiqueta repetida, ej. `cuit`/`cuit_2`) y los campos
+   que hayan arrastrado texto de más (típico en tablas de dos columnas).
+   También se puede agregar campos a mano con **"+ Agregar campo"**,
+   ponerle un nombre, y elegir:
    - **Regex**: escribir una o más expresiones (una por línea, con un
      grupo de captura) y apretar **"Probar campo"** para ver el valor
      extraído en vivo contra el PDF subido.

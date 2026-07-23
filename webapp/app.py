@@ -192,6 +192,18 @@ def test_field():
     return jsonify({"value": result.get("_test")})
 
 
+@app.post("/suggest-fields")
+def suggest_fields():
+    """Analiza la sesión activa y propone un borrador de campos (regex por
+    cada 'Etiqueta: valor' detectado), para no tener que escribirlos todos a
+    mano. El resultado es un punto de partida a revisar en el frontend."""
+    body = request.get_json(force=True, silent=False) or {}
+    session = _session_or_404(body.get("session_id"))
+
+    fields = remito_extractor.suggest_fields(session["pages_text"])
+    return jsonify({"fields": fields})
+
+
 @app.post("/extract-all")
 def extract_all():
     """Corre todos los campos de una plantilla (guardada o borrador) contra la sesión actual."""

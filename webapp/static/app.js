@@ -200,6 +200,29 @@ function setActiveDrawField(fieldId) {
 
 $("#addFieldBtn").addEventListener("click", () => addFieldRow());
 
+$("#suggestFieldsBtn").addEventListener("click", async () => {
+  const status = $("#suggestStatus");
+  if (!sessionId) {
+    alert("Subí un PDF de ejemplo primero.");
+    return;
+  }
+  status.textContent = "Analizando...";
+  try {
+    const data = await api("/suggest-fields", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    const entries = Object.entries(data.fields || {});
+    entries.forEach(([name, def]) => addFieldRow(name, def));
+    status.textContent = entries.length
+      ? `Se agregaron ${entries.length} campo(s) sugeridos. Es un borrador: revisá nombres repetidos (con sufijo _2, _3...) y probá cada uno antes de guardar.`
+      : "No se detectaron pares 'Etiqueta: valor' en este PDF.";
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+  }
+});
+
 function clearFields() {
   fieldsContainer.innerHTML = "";
 }

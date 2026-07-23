@@ -109,7 +109,18 @@ python3 remito_extractor.py ./carpeta_remitos -o resultados.xlsx
 Ver [`providers/README.md`](providers/README.md) para el esquema completo
 de las plantillas (regex vs. región fija de página) y el paso a paso para
 sumar un proveedor nuevo a mano. También se puede hacer visualmente con
-la interfaz web (ver abajo).
+la interfaz web (ver abajo), o generar un borrador automáticamente:
+
+```
+python3 remito_extractor.py remito_nuevo.pdf --suggest-template -o providers/proveedor_nuevo.json
+```
+
+Analiza el PDF, detecta pares "Etiqueta: valor" y propone una plantilla
+con una regex por campo. Es un punto de partida para revisar, no un
+resultado definitivo: conviene completar `match`, revisar los nombres que
+quedaron numerados (`cuit`, `cuit_2`, ...) porque la misma etiqueta
+aparece más de una vez, y los campos de filas con dos columnas que a
+veces arrastran texto de la columna vecina.
 
 ## Interfaz gráfica (`webapp/`)
 
@@ -128,6 +139,10 @@ Permite:
   cada página.
 - Elegir una plantilla existente para editarla, o crear una nueva
   (ID + nombre + marcadores de detección automática).
+- **Sugerir campos automáticamente** con un botón: analiza el PDF y
+  agrega un campo (con su regex) por cada "Etiqueta: valor" que detecta,
+  para no escribirlos todos a mano — quedan como borrador para revisar,
+  probar y ajustar antes de guardar.
 - Por cada campo: escribir una o más regex y probarlas en vivo contra el
   texto OCR, **o** dibujar con el mouse una región (bbox) sobre la imagen
   de la página para campos en una posición fija (sellos, numeración
