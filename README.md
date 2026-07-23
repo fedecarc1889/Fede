@@ -78,7 +78,34 @@ coincidencia en el documento (probablemente hay que ajustar la plantilla).
 
 Ver [`providers/README.md`](providers/README.md) para el esquema completo
 de las plantillas (regex vs. región fija de página) y el paso a paso para
-sumar un proveedor nuevo.
+sumar un proveedor nuevo a mano. También se puede hacer visualmente con
+la interfaz web (ver abajo).
+
+## Interfaz gráfica (`webapp/`)
+
+Miniapp Flask para configurar las plantillas de proveedor sin editar JSON
+a mano:
+
+```
+pip install -r requirements.txt
+python3 webapp/app.py
+# abrir http://127.0.0.1:5000
+```
+
+Permite:
+
+- Subir un PDF de ejemplo del remito y ver su texto OCR y la imagen de
+  cada página.
+- Elegir una plantilla existente para editarla, o crear una nueva
+  (ID + nombre + marcadores de detección automática).
+- Por cada campo: escribir una o más regex y probarlas en vivo contra el
+  texto OCR, **o** dibujar con el mouse una región (bbox) sobre la imagen
+  de la página para campos en una posición fija (sellos, numeración
+  pre-impresa).
+- Probar la extracción completa de la plantilla contra el PDF de ejemplo
+  antes de guardar.
+- Guardar, lo que escribe/actualiza `providers/<id>.json` — el mismo
+  archivo que usa `remito_extractor.py` por línea de comandos.
 
 ## Estructura
 
@@ -90,4 +117,7 @@ providers/             Plantillas de proveedores (una por archivo .json)
   generic.json          Plantilla de respaldo con reglas genéricas
   proveedor_ejemplo.json  Ejemplo de plantilla con regex y campo bbox
   README.md             Esquema de las plantillas
+webapp/                Interfaz gráfica (Flask) para configurar plantillas
+  app.py                 Backend: subida de PDF, OCR, guardado/prueba de plantillas
+  templates/, static/    Frontend (HTML/CSS/JS, sin dependencias externas)
 ```
