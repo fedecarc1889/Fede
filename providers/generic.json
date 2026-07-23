@@ -1,0 +1,52 @@
+{
+  "label": "Plantilla genérica (fallback)",
+  "match": [],
+  "fields": {
+    "numero_remito": {
+      "regex": [
+        "Remito[^\\d]{0,12}([0-9][0-9\\-]{3,})",
+        "Comprobante[^\\d]{0,12}([0-9][0-9\\-]{3,})"
+      ]
+    },
+    "fecha": {
+      "regex": [
+        "Fecha\\s*(?:de\\s*emisi[oó]n)?\\s*:?\\s*(\\d{1,2}[/\\-]\\d{1,2}[/\\-]\\d{2,4})"
+      ]
+    },
+    "cuit_emisor": {
+      "regex": [
+        "C\\.?U\\.?I\\.?T\\.?\\s*:?\\s*(\\d{2}-?\\d{8}-?\\d)"
+      ]
+    },
+    "razon_social_emisor": {
+      "regex": [
+        "Raz[oó]n\\s*Social\\s*:?\\s*(.+)"
+      ]
+    },
+    "cliente": {
+      "regex": [
+        "(?:Sr\\.?\\(?es\\)?|Cliente|Se[nñ]or(?:es)?|Destinatario)\\s*:?\\s*(.+)"
+      ]
+    },
+    "domicilio_entrega": {
+      "regex": [
+        "Domicilio\\s*(?:de\\s*entrega)?\\s*:?\\s*(.+)"
+      ]
+    },
+    "transportista": {
+      "regex": [
+        "Transport(?:e|ista)\\s*:?\\s*(.+)"
+      ]
+    },
+    "cantidad_bultos": {
+      "regex": [
+        "(?:Cantidad\\s*de\\s*)?Bultos\\s*:?\\s*(\\d+)"
+      ]
+    },
+    "total": {
+      "regex": [
+        "Total\\s*:?\\s*\\$?\\s*([\\d\\.,]+)"
+      ]
+    }
+  }
+}

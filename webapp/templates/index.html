@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Editor de plantillas de remitos</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Editor de plantillas de remitos</h1>
+    <p class="subtitle">Configurá visualmente qué campos extraer por proveedor de remitos.</p>
+  </header>
+
+  <main>
+    <section class="panel" id="setup-panel">
+      <h2>1. Proveedor</h2>
+      <div class="row">
+        <label>Plantilla existente
+          <select id="providerSelect">
+            <option value="">-- nueva plantilla --</option>
+            {% for pid, cfg in providers.items() %}
+              <option value="{{ pid }}">{{ cfg.get('label', pid) }} ({{ pid }})</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>ID del proveedor
+          <input type="text" id="providerId" placeholder="ej. acme_sa">
+        </label>
+        <label>Nombre visible
+          <input type="text" id="providerLabel" placeholder="ej. ACME S.A.">
+        </label>
+      </div>
+      <div class="row">
+        <label class="grow">Marcadores de detección automática (uno por línea, regex)
+          <textarea id="providerMatch" rows="2" placeholder="ACME\s+S\.A\.&#10;30-11111111-1"></textarea>
+        </label>
+      </div>
+
+      <h2>2. PDF de ejemplo</h2>
+      <form id="uploadForm" class="row">
+        <label>Archivo PDF
+          <input type="file" id="pdfFile" accept="application/pdf" required>
+        </label>
+        <label>Idioma OCR
+          <input type="text" id="ocrLang" value="spa" size="6">
+        </label>
+        <button type="submit">Subir y analizar</button>
+      </form>
+      <p id="uploadStatus" class="status"></p>
+    </section>
+
+    <section class="panel" id="preview-panel" hidden>
+      <h2>3. Vista previa</h2>
+      <div class="row">
+        <label>Página
+          <select id="pageSelect"></select>
+        </label>
+        <span id="detectedHint" class="hint"></span>
+      </div>
+      <div class="preview-columns">
+        <div class="image-wrap">
+          <img id="pageImg" alt="Página del PDF">
+          <canvas id="bboxCanvas"></canvas>
+        </div>
+        <div class="ocr-wrap">
+          <h3>Texto OCR de la página</h3>
+          <pre id="ocrText"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="fields-panel" hidden>
+      <h2>4. Campos</h2>
+      <div class="row">
+        <button type="button" id="suggestFieldsBtn">Sugerir campos automáticamente</button>
+        <span id="suggestStatus" class="status"></span>
+      </div>
+      <div id="fieldsContainer"></div>
+      <button type="button" id="addFieldBtn">+ Agregar campo</button>
+
+      <div class="row actions">
+        <button type="button" id="saveTemplateBtn" class="primary">Guardar plantilla</button>
+        <button type="button" id="extractAllBtn">Probar extracción completa</button>
+        <button type="button" id="downloadExcelBtn">Descargar como Excel</button>
+      </div>
+      <p id="saveStatus" class="status"></p>
+      <pre id="extractResult" class="result-box" hidden></pre>
+    </section>
+  </main>
+
+  <template id="fieldRowTemplate">
+    <div class="field-row" data-field-id="">
+      <div class="field-row-header">
+        <input type="text" class="f-name" placeholder="nombre_del_campo">
+        <label class="method"><input type="radio" name="" class="f-method" value="regex" checked> Regex</label>
+        <label class="method"><input type="radio" name="" class="f-method" value="bbox"> Región (bbox)</label>
+        <button type="button" class="f-remove" title="Eliminar campo">✕</button>
+      </div>
+
+      <div class="f-regex-block">
+        <textarea class="f-regex" rows="2" placeholder="Una regex por línea, con un grupo (...) de captura"></textarea>
+        <label class="inline">
+          <input type="checkbox" class="f-limit-page"> limitar a la página
+          <input type="number" class="f-page" min="0" value="0" style="width:3.5em" disabled>
+        </label>
+      </div>
+
+      <div class="f-bbox-block" hidden>
+        <label class="inline">página <input type="number" class="f-bbox-page" min="0" value="0" style="width:3.5em"></label>
+        <button type="button" class="f-draw">Dibujar región sobre la imagen</button>
+        <span class="f-bbox-value">(sin región)</span>
+      </div>
+
+      <div class="field-row-footer">
+        <button type="button" class="f-test">Probar campo</button>
+        <span class="f-result"></span>
+      </div>
+    </div>
+  </template>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

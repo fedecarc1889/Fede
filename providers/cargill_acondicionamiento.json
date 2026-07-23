@@ -1,0 +1,84 @@
+{
+  "label": "CARGILL - Comprobante de Acondicionamiento",
+  "match": [
+    "Comprobantes\\s+de\\s+Acondicionamiento",
+    "CARGILL"
+  ],
+  "fields": {
+    "numero": {
+      "regex": ["N[uú]mero:\\s*(\\S+)"]
+    },
+    "fecha": {
+      "regex": ["Fecha\\s*(\\d{1,2}/\\d{1,2}/\\d{2,4})"]
+    },
+    "remitente": {
+      "regex": ["Remitente:\\s*(.+?)\\s*CUIT:"]
+    },
+    "cuit_remitente": {
+      "regex": ["Remitente:.*?CUIT:\\s*([\\d\\-]+)"]
+    },
+    "domicilio": {
+      "regex": ["Domicilio:\\s*(.+?)\\s*Localidad:"]
+    },
+    "localidad": {
+      "regex": ["Localidad:\\s*(\\S+)"]
+    },
+    "transporte": {
+      "regex": ["Transporte:\\s*(.+?)\\s*CUIT:"]
+    },
+    "cuit_transportista": {
+      "regex": ["Transporte:.*?CUIT:\\s*([\\d\\-]+)"]
+    },
+    "chofer": {
+      "regex": ["Chofer:\\s*(.+?)\\s*CUIL"]
+    },
+    "patente_chasis": {
+      "regex": ["Pat\\.\\s*Chasis:\\s*(.+?)\\s*Pat\\.\\s*Acoplado:"]
+    },
+    "patente_acoplado": {
+      "regex": ["Pat\\.\\s*Acoplado:\\s*(.+?)\\s*Kilos"]
+    },
+    "producto": {
+      "regex": ["Producto:\\s*(.+?)\\s*Compbte"]
+    },
+    "kilos_brutos": {
+      "regex": ["Kilos\\s*Brutos:\\s*([\\d\\.,]+)"]
+    },
+    "kilos_tara": {
+      "regex": ["Kilos\\s*Tara:\\s*([\\d\\.,]+)"]
+    },
+    "kilos_netos": {
+      "regex": ["Kilos\\s*Netos:\\s*([\\d\\.,]+)"]
+    },
+    "kilos_brutos_calidad": {
+      "regex": ["K\\s+I\\s+L\\s+O\\s+S\\s+B\\s+R\\s+U\\s+T\\s+O\\s+S\\s+([\\d\\.,]+)"]
+    },
+    "kilos_netos_calidad": {
+      "regex": ["K\\s+I\\s+L\\s+O\\s+S\\s+N\\s+E\\s+T\\s+O\\s+S\\s+([\\d\\.,]+)"]
+    },
+    "zarandeo_porcentaje": {
+      "regex": ["Zarandeo:\\s*([\\d,]+)\\s*%"]
+    },
+    "humedad_porcentaje": {
+      "regex": ["Humedad:\\s*([\\d,]+%)"]
+    },
+    "humedad_descuento_porcentaje": {
+      "regex": ["Humedad:\\s*[\\d,]+%\\s*([\\d,]+)\\s*%"]
+    },
+    "humedad_descuento_kilos": {
+      "regex": ["Humedad:.*?%\\s*(\\d+)\\s*Secada"]
+    },
+    "volatil_porcentaje": {
+      "regex": ["Vol[áa]til:\\s*([\\d,]+)\\s*%"]
+    },
+    "volatil_descuento_kilos": {
+      "regex": ["Vol[áa]til:.*?%\\s*(\\d+)\\s*Aireacion"]
+    },
+    "aireacion_porcentaje": {
+      "regex": ["Aireaci[óo]n:\\s*([\\d,]+)\\s*%"]
+    },
+    "calidad_porcentaje": {
+      "regex": ["Calidad:\\s*([\\d,]+)\\s*%"]
+    }
+  }
+}

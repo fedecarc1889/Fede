@@ -1,0 +1,489 @@
+# Documentación completa
+
+Extractor dinámico de campos de remitos en PDF, con OCR y plantillas
+configurables por proveedor. Este documento cubre qué se construyó, cómo
+instalarlo y cómo usar cada pieza.
+
+---
+
+## 1. Resumen del proyecto
+
+El objetivo es leer remitos escaneados (PDF) de distintos proveedores —
+cada uno con su propio formato— y extraer campos estructurados (número de
+remito, fecha, cliente, etc.) de forma automática. Como cada proveedor
+ubica y etiqueta esos datos de manera distinta, la extracción no está
+"hardcodeada": se define mediante **plantillas** (una por proveedor) que
+el sistema selecciona dinámicamente, ya sea detectando automáticamente al
+proveedor a partir del texto OCR, o indicándolo manualmente.
+
+Existen dos formas de trabajar con las plantillas: editando los archivos
+JSON a mano, o mediante una interfaz web que permite probarlas visualmente
+contra un PDF de ejemplo antes de guardarlas.
+
+---
+
+## 2. Qué se desarrolló
+
+### Etapa 1 — OCR base
+
+`ocr_reader.py`: CLI que extrae texto plano de imágenes (PNG, JPG, BMP,
+TIFF, GIF, WEBP) y de PDFs, usando Tesseract (vía `pytesseract`) como
+motor de OCR y PyMuPDF (`fitz`) para renderizar cada página de un PDF
+como imagen antes de pasarla por OCR. Soporta procesar un archivo o un
+directorio completo, con selección de idioma.
+
+### Etapa 2 — Núcleo de OCR compartido
+
+`ocr_core.py`: se extrajo la lógica común de renderizado de páginas PDF y
+OCR (que antes vivía solo en `ocr_reader.py`) a un módulo reutilizable,
+para que tanto `ocr_reader.py` como el nuevo extractor de campos la
+compartan sin duplicar código. Expone:
+- `ocr_image(img, lang)` — OCR de una imagen ya cargada en memoria.
+- `render_pdf_page(doc, page_index, zoom)` — renderiza una página de un
+  PDF abierto (fitz) a imagen PIL.
+- `ocr_pdf_pages(path, lang, zoom, progress_callback)` — OCR de todas las
+  páginas de un PDF, retorna una lista de strings (uno por página).
+- `ocr_pdf(path, lang, zoom)` — igual que la anterior pero como un único
+  string con separadores de página.
+- `ocr_pdf_region(path, page_index, bbox, lang, zoom)` — OCR de solo una
+  región (rectángulo) de una página, dado un bbox normalizado (0.0–1.0).
+  Es la pieza que permite leer campos en una posición fija del formulario
+  (sellos, numeración pre-impresa) cuando una regex sobre el texto
+  completo no es confiable.
+- `get_pdf_pages_text(path, lang, zoom, y_tolerance)` — extracción híbrida
+  (agregada más adelante, ver etapa 7): usa el texto embebido del PDF
+  cuando existe, y solo cae a OCR con Tesseract si la página no tiene
+  texto (escaneo real). Es la que usan `remito_extractor.py` y la
+  interfaz web para obtener el texto sobre el que corren las regex.
+
+### Etapa 3 — Extractor dinámico de campos (`remito_extractor.py`)
+
+CLI que:
+1. Extrae el texto del PDF de entrada (reutilizando `ocr_core`).
+2. Determina qué **plantilla de proveedor** usar:
+   - **Automáticamente**, comparando el texto OCR contra los marcadores
+     regex (`match`) definidos en cada plantilla — gana la plantilla con
+     más coincidencias.
+   - **Manualmente**, con `-p/--provider <id>`.
+   - Si no se detecta ninguna, cae en `providers/generic.json` como
+     respaldo.
+3. Aplica las reglas de cada campo de la plantilla elegida: una o más
+   regex sobre el texto (con reintento en orden hasta que una matchee), o
+   una región `bbox` de una página específica.
+4. Permite filtrar qué campos extraer con `-f/--fields` en vez de todos
+   los de la plantilla.
+5. Imprime (o guarda) el resultado como JSON:
+   `{"archivo", "proveedor", "campos": {...}}`, con `null` en los campos
+   que no matchearon nada (señal de que hay que ajustar la plantilla).
+
+Comandos de exploración: `--list-providers` (qué plantillas hay) y
+`--list-fields -p <id>` (qué campos define una plantilla puntual).
+
+`input` también puede ser una **carpeta**: en ese caso se procesan todos
+los `.pdf` que contenga (de uno o varios proveedores, cada uno detectado
+o resuelto por separado) y el resultado es una lista de resultados en vez
+de uno solo. Si un archivo falla (OCR roto, proveedor no encontrado), no
+frena al resto: ese resultado queda con una clave `"error"` y se sigue con
+los demás.
+
+### Exportación a Excel
+
+Si `-o` termina en `.xlsx`/`.xls`, en vez de JSON se genera un libro de
+Excel (`write_excel()`, con `openpyxl`) con **una fila por remito
+procesado** y **una columna por campo**. Las columnas son la unión de
+todos los campos vistos en todos los resultados (útil cuando la carpeta
+mezcla remitos de proveedores distintos, con campos distintos: los que no
+aplican a un remito puntual quedan en blanco en esa fila), con `archivo` y
+`proveedor` siempre como primeras columnas, encabezado en negrita y ancho
+de columna ajustado al contenido. Sirve tanto para un PDF individual como
+para una carpeta entera — es la forma recomendada de consolidar muchos
+remitos en una sola planilla ordenada.
+
+### Etapa 4 — Plantillas de proveedor (`providers/`)
+
+Cada plantilla es un archivo `providers/<id>.json`:
+
+```json
+{
+  "label": "Nombre legible",
+  "match": ["regex que identifica al proveedor en el texto OCR"],
+  "fields": {
+    "numero_remito": { "regex": ["Remito[^\\d]{0,12}([0-9][0-9\\-]{3,})"] },
+    "zona_sello":    { "bbox": [0.75, 0.03, 0.98, 0.10], "page": 0 }
+  }
+}
+```
+
+Se incluyen `generic.json` (plantilla de respaldo con reglas laxas para
+campos comunes de remito) y `proveedor_ejemplo.json` (ejemplo con ambos
+métodos de extracción). El esquema completo está en
+[`providers/README.md`](providers/README.md). Los archivos que empiezan
+con `_` se ignoran al cargar (útil para borradores).
+
+Un detalle de diseño no evidente: las regex de `numero_remito` evitan
+depender del carácter "°" (grado) porque Tesseract lo reconoce de forma
+muy inconsistente según la fuente (a veces "N°", a veces "N*", "N9",
+etc.); en cambio, matchean "Remito" seguido de hasta N caracteres
+no-numéricos y luego el número, sin importar cómo se OCR-ee el símbolo de
+por medio.
+
+### Etapa 5 — Interfaz gráfica (`webapp/`)
+
+Miniapp Flask para crear y editar plantillas sin tocar JSON a mano:
+
+- **Backend** (`webapp/app.py`): recibe un PDF de ejemplo, lo procesa con
+  `ocr_core` y guarda el resultado (texto OCR por página + ruta del PDF)
+  en una sesión en memoria identificada por un `session_id`. Expone
+  endpoints para: listar/cargar/guardar plantillas (mismo formato que usa
+  `remito_extractor.py`), servir la imagen renderizada de cada página,
+  probar un campo individual (regex y/o bbox) contra la sesión activa, y
+  correr la extracción completa de una plantilla (guardada o un borrador
+  en el navegador) para previsualizar el resultado antes de guardar.
+- **Frontend** (`webapp/templates/`, `webapp/static/`): HTML/CSS/JS sin
+  dependencias externas (sin frameworks, sin CDN). Permite subir el PDF,
+  navegar sus páginas, ver el texto OCR, agregar/quitar campos, escribir
+  regex y probarlas en vivo, o dibujar con el mouse un rectángulo sobre la
+  imagen de la página (se traduce a coordenadas normalizadas para el
+  campo `bbox`), y guardar todo con un botón.
+
+Reutiliza directamente `ocr_core` y `remito_extractor` (los importa desde
+la raíz del repo) — no duplica ninguna lógica de OCR ni de extracción,
+incluyendo `write_excel()`: el botón **"Descargar como Excel"** llama al
+endpoint `POST /extract-all/excel`, que corre la extracción sobre la
+sesión activa y devuelve un `.xlsx` de una fila descargable, generado con
+la misma función que usa el modo carpeta del CLI.
+
+### Etapa 6 — Instalación simplificada
+
+`install.sh`: automatiza la instalación de Tesseract (detecta `apt-get` o
+`brew`), crea un entorno virtual de Python en `./venv` e instala
+`requirements.txt`.
+
+### Etapa 7 — Exportación a Excel y modo carpeta
+
+`remito_extractor.py` ahora acepta una **carpeta** además de un PDF
+individual (procesa todos los `.pdf` que contenga, cada uno con su propio
+proveedor detectado o resuelto). Si `-o` termina en `.xlsx`/`.xls`, en vez
+de JSON se genera un libro de Excel (`write_excel()`, con `openpyxl`) con
+una fila por remito y una columna por campo — unión de todos los campos
+vistos en todos los proveedores procesados, con `archivo` y `proveedor`
+como primeras columnas. La interfaz web suma el mismo resultado con un
+botón **"Descargar como Excel"** (`POST /extract-all/excel`), que arma un
+`.xlsx` de una fila con la sesión activa.
+
+### Etapa 8 — Extracción híbrida de texto (nativo + OCR)
+
+Se detectó, con un remito real (un comprobante de acondicionamiento de
+CARGILL), que muchos PDFs "de remito" no son escaneos sino **PDFs
+nativos con texto embebido** — generados por un sistema, no fotografiados.
+Correr Tesseract sobre la imagen renderizada de esos PDFs es innecesario y
+además introduce errores de reconocimiento que un PDF nativo no tiene
+(ej. "N°" leído como "N*", comas confundidas con puntos en montos, etc.).
+
+Pero además, extraer el texto embebido de forma cruda
+(`page.get_text()` de PyMuPDF) tampoco alcanza: en comprobantes con
+layout de tabla/formulario, el orden del contenido del PDF suele agrupar
+primero **todas las etiquetas** de una sección y recién después **todos
+los valores** (ej. "Remitente: Domicilio: CUIT: ACME CalleFalsa123
+30-11111111-1"), rompiendo cualquier regex tipo "Etiqueta: valor" que
+espere que el valor venga justo después de su etiqueta.
+
+La solución, en `ocr_core.get_pdf_pages_text()`:
+1. Para cada página, pide las palabras con sus coordenadas
+   (`page.get_text("words")`).
+2. Si la página tiene palabras (PDF nativo), las reconstruye en **orden
+   de lectura real**: las agrupa en filas por proximidad vertical
+   (`_reconstruct_reading_order()`, tolerancia configurable) y ordena
+   cada fila de izquierda a derecha — así "Remitente:" y su valor quedan
+   en la misma línea, en el orden en que se ven visualmente.
+3. Si la página no tiene palabras (es una imagen escaneada sin texto),
+   recién ahí renderiza la página y corre Tesseract, como antes.
+
+`remito_extractor.py` y `webapp/app.py` usan `get_pdf_pages_text()` en vez
+de `ocr_pdf_pages()` para obtener el texto sobre el que corren las regex
+(el OCR de regiones `bbox` puntuales sigue igual, vía
+`ocr_pdf_region()`). `ocr_reader.py` no se tocó: sigue haciendo OCR
+"real" siempre, porque su función es específicamente esa.
+
+### Etapa 9 — Sugerencia automática de plantillas (`suggest_fields()`)
+
+Armar una plantilla nueva a mano (una regex por campo) es el paso más
+lento del flujo. `remito_extractor.suggest_fields(pages_text)` genera un
+**borrador** analizando el texto (ya en orden de lectura) en busca de
+pares "Etiqueta: valor":
+
+1. Por cada línea, separa tokens (palabras) y ubica los que terminan en
+   `:` — esas son las "anclas" de etiqueta. Trabajar a nivel de palabra
+   (no con una regex de mayúsculas sobre la línea completa) es clave:
+   una heurística basada en "palabra en mayúsculas = etiqueta" falla
+   feo en remitos reales, porque razones sociales y nombres propios
+   también vienen en mayúsculas (ej. confundía "CARGILL S.A.C.I.
+   FEED/SOYBEANS" -- el *valor* de "Remitente:" -- con parte de la
+   siguiente etiqueta).
+2. Etiquetas de dos palabras (ej. "Pat. Chasis:", "Kilos Brutos:") se
+   arman mirando si la palabra anterior a la ancla es un calificador
+   corto y no está en mayúsculas (`_is_label_qualifier()`) — así no
+   confunde "Kilos" (calificador) con "SCHIAVONI" o "SAS" (valores en
+   mayúsculas que casualmente preceden a una etiqueta).
+3. El valor de cada campo es el texto entre su etiqueta y la siguiente
+   ancla de la misma línea (o el resto de la línea si es la última). La
+   regex generada usa `\b` antes de la etiqueta para no matchear como
+   substring (ej. sin ese límite, `Calidad:` matcheaba dentro de
+   `Localidad:`, capturando el valor equivocado — bug real encontrado al
+   validar contra el remito de CARGILL).
+4. Etiquetas repetidas (ej. "CUIT:" de remitente y de transportista)
+   quedan numeradas (`cuit`, `cuit_2`) — hay que revisarlas y renombrarlas.
+
+Es explícitamente un **borrador para revisar**, no un resultado
+definitivo: en tablas de dos columnas donde la etiqueta de la columna
+vecina no tiene ':' pegado a la palabra (ej. "Paritaria (P) :", con un
+espacio antes de los dos puntos), el campo de la izquierda puede
+arrastrar texto de esa columna. Validado contra el remito real de
+CARGILL: de 29 campos sugeridos, 21 salieron perfectos sin ajuste.
+
+Expuesto en dos lugares:
+- CLI: `python3 remito_extractor.py remito.pdf --suggest-template -o providers/nuevo.json`
+- Interfaz web: botón **"Sugerir campos automáticamente"**, que llama a
+  `POST /suggest-fields` y agrega una fila de campo por cada sugerencia
+  para revisar/probar/ajustar antes de guardar.
+
+---
+
+## 3. Estructura de archivos
+
+```
+ocr_core.py             Núcleo de extracción compartido (texto nativo + OCR, render de páginas, OCR de región)
+ocr_reader.py            CLI de OCR genérico (texto plano de imágenes/PDFs)
+remito_extractor.py      CLI de extracción de campos (archivo o carpeta, JSON o Excel) y de sugerencia de plantillas (--suggest-template)
+providers/               Plantillas de proveedores (una por archivo .json)
+  generic.json             Plantilla de respaldo con reglas genéricas
+  proveedor_ejemplo.json   Ejemplo de plantilla con regex y campo bbox
+  cargill_acondicionamiento.json  Plantilla real (comprobante de acondicionamiento de granos)
+  README.md                Esquema de las plantillas
+webapp/                  Interfaz gráfica (Flask) para configurar plantillas
+  app.py                    Backend: subida de PDF, extracción, guardado/prueba de plantillas, descarga de Excel
+  templates/index.html      Estructura de la página
+  static/app.js             Lógica de la interfaz (subida, canvas de bbox, tests, guardado, descarga)
+  static/style.css          Estilos
+install.sh               Script de instalación automática
+requirements.txt         Dependencias de Python
+README.md                Guía rápida
+DOCUMENTACION.md         Este documento
+```
+
+---
+
+## 4. Instalación paso a paso
+
+### Requisitos previos
+
+- Python 3.10 o superior.
+- Tesseract OCR instalado en el sistema (es un programa nativo, no una
+  librería de Python).
+
+### Opción A — instalación automática (recomendada)
+
+```bash
+git clone <url-del-repo>
+cd Fede
+./install.sh
+source venv/bin/activate
+```
+
+`install.sh` detecta el gestor de paquetes del sistema (`apt-get` en
+Linux, `brew` en macOS) e instala Tesseract si hace falta, además de crear
+el entorno virtual e instalar las dependencias de Python.
+
+### Opción B — instalación manual
+
+**1. Clonar el repositorio y entrar a la carpeta:**
+```bash
+git clone <url-del-repo>
+cd Fede
+```
+
+**2. Instalar Tesseract OCR (dependencia de sistema):**
+
+Ubuntu/Debian:
+```bash
+sudo apt-get update
+sudo apt-get install -y tesseract-ocr tesseract-ocr-spa
+```
+
+macOS (Homebrew):
+```bash
+brew install tesseract tesseract-lang
+```
+
+Windows: instalador en https://github.com/UB-Mannheim/tesseract/wiki
+(tildar el paquete de idioma "Spanish" durante la instalación).
+
+Verificar:
+```bash
+tesseract --version
+```
+
+**3. Crear un entorno virtual de Python (recomendado, no obligatorio):**
+```bash
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+```
+
+**4. Instalar las dependencias de Python:**
+```bash
+pip install -r requirements.txt
+```
+
+Con esto queda todo instalado: `pytesseract`, `Pillow`, `pymupdf` y
+`Flask`.
+
+---
+
+## 5. Uso
+
+### 5.1. OCR de un archivo o carpeta (`ocr_reader.py`)
+
+```bash
+python3 ocr_reader.py remito.pdf -l spa
+python3 ocr_reader.py foto.jpg -o resultado.txt
+python3 ocr_reader.py ./carpeta_remitos -l spa --output-dir ./textos
+python3 ocr_reader.py --list-langs        # idiomas de Tesseract instalados
+```
+
+### 5.2. Extracción de campos por línea de comandos (`remito_extractor.py`)
+
+```bash
+# detección automática de proveedor, todos los campos de su plantilla
+python3 remito_extractor.py remito.pdf
+
+# forzar una plantilla puntual
+python3 remito_extractor.py remito.pdf -p proveedor_ejemplo
+
+# extraer solo ciertos campos
+python3 remito_extractor.py remito.pdf -f numero_remito,fecha,cliente
+
+# guardar el resultado en JSON
+python3 remito_extractor.py remito.pdf -o resultado.json
+
+# procesar una carpeta con varios remitos (de uno o varios proveedores)
+# y consolidar todo en un Excel: una fila por remito, una columna por campo
+python3 remito_extractor.py ./carpeta_remitos -o resultados.xlsx
+
+# explorar plantillas disponibles
+python3 remito_extractor.py --list-providers
+python3 remito_extractor.py --list-fields -p proveedor_ejemplo
+```
+
+Salida por defecto (JSON):
+```json
+{
+  "archivo": "remito.pdf",
+  "proveedor": "proveedor_ejemplo",
+  "campos": {
+    "numero_remito": "0001-00012345",
+    "fecha": "15/03/2026",
+    "cliente": "Juan Pérez"
+  }
+}
+```
+
+Con `-o resultados.xlsx` (o `.xls`), en cambio, se genera una planilla con
+una fila por PDF procesado y una columna por cada campo encontrado en
+cualquiera de las plantillas usadas (las celdas que no aplican a un
+remito puntual quedan vacías). Al procesar una carpeta, si algún PDF falla
+(no se pudo hacer OCR, o no se detectó proveedor y no hay `generic`), esa
+fila queda con una columna `error` en vez de frenar el resto del lote.
+
+#### Generar un borrador de plantilla automáticamente
+
+En vez de escribir cada regex a mano, `--suggest-template` analiza un PDF
+de ejemplo y propone un borrador (ver etapa 9 en la sección 2):
+
+```bash
+python3 remito_extractor.py remito_nuevo.pdf --suggest-template -o providers/proveedor_nuevo.json
+```
+
+Genera `providers/proveedor_nuevo.json` con `"match": []` (hay que
+completarlo) y un campo por cada "Etiqueta: valor" detectado. Es un punto
+de partida: conviene revisar los nombres numerados (`cuit`, `cuit_2`,
+...) porque la misma etiqueta se repite, y probar cada campo con
+`--list-fields -p proveedor_nuevo` o directamente corriendo la
+extracción, para ajustar los que hayan arrastrado texto de más.
+
+### 5.3. Interfaz gráfica (`webapp/`)
+
+```bash
+python3 webapp/app.py
+```
+Abrir **http://127.0.0.1:5000**.
+
+Flujo típico para dar de alta un proveedor nuevo:
+
+1. **Subir un PDF de ejemplo** de un remito real de ese proveedor (con
+   idioma OCR, por defecto `spa`).
+2. Elegir **"-- nueva plantilla --"** o una existente para editarla.
+3. Completar **ID** (identificador corto, sin espacios, ej. `acme_sa`),
+   **nombre visible** y, opcionalmente, **marcadores de detección
+   automática** (regex que identifiquen al proveedor en su texto OCR, ej.
+   su razón social o CUIT).
+4. **"Sugerir campos automáticamente"** agrega de entrada un campo (con
+   su regex) por cada "Etiqueta: valor" que detecta en el PDF — no hace
+   falta partir de cero. Es un borrador: conviene revisar los nombres
+   numerados (misma etiqueta repetida, ej. `cuit`/`cuit_2`) y los campos
+   que hayan arrastrado texto de más (típico en tablas de dos columnas).
+   También se puede agregar campos a mano con **"+ Agregar campo"**,
+   ponerle un nombre, y elegir:
+   - **Regex**: escribir una o más expresiones (una por línea, con un
+     grupo de captura) y apretar **"Probar campo"** para ver el valor
+     extraído en vivo contra el PDF subido.
+   - **Región (bbox)**: apretar **"Dibujar región sobre la imagen"** y
+     arrastrar el mouse sobre la zona de la página donde está el dato
+     (útil para sellos o numeración impresa que la regex no capta bien).
+5. **"Probar extracción completa"** para ver el JSON final con todos los
+   campos antes de guardar, o **"Descargar como Excel"** para bajar ese
+   mismo resultado como una planilla `.xlsx` de una fila (útil para
+   revisar rápido el formato de salida sin usar la línea de comandos).
+6. **"Guardar plantilla"** → se escribe/actualiza `providers/<id>.json`.
+
+A partir de ahí, ese proveedor queda disponible tanto en la interfaz
+gráfica como en `remito_extractor.py` (por `-p <id>` o por detección
+automática si sus `match` coinciden con un remito nuevo). Para consolidar
+**muchos** remitos en una sola planilla, usar el modo carpeta del CLI
+(`remito_extractor.py ./carpeta_remitos -o resultados.xlsx`) — la
+interfaz gráfica solo procesa un PDF de ejemplo a la vez, pensada para
+diseñar y probar plantillas, no para el procesamiento masivo.
+
+---
+
+## 6. Esquema de las plantillas de proveedor
+
+Ver el detalle completo en [`providers/README.md`](providers/README.md).
+En resumen, cada campo admite:
+
+- `regex`: una regex o lista de regex (se prueban en orden). Si tiene un
+  grupo `(...)`, se usa ese grupo; si no, el match completo. Opcionalmente
+  `page` para restringir la búsqueda a una página puntual.
+- `bbox`: `[x0, y0, x1, y1]` normalizado (0.0–1.0) más `page`, para OCR-ear
+  solo esa región de la imagen renderizada. Se usa si `regex` no matcheó,
+  o como único método si el campo no define `regex`.
+
+---
+
+## 7. Resolución de problemas
+
+- **`ERROR: pymupdf no instalado`** → `pip install -r requirements.txt`
+  dentro del entorno virtual activado.
+- **Texto OCR vacío o con muchos errores** → probar con `-l spa+eng` o el
+  idioma correcto; verificar que el paquete de idioma de Tesseract esté
+  instalado (`python3 ocr_reader.py --list-langs`).
+- **Un campo da `null`** → la regex no matcheó nada del texto OCR real.
+  Correr `python3 ocr_reader.py <pdf> -l spa` para ver el texto crudo y
+  ajustar la regex a como quedó (Tesseract puede introducir errores en
+  símbolos como "°", tildes o mayúsculas).
+- **La región `bbox` da un texto incorrecto** → las coordenadas están mal
+  ubicadas o el zoom de renderizado es bajo; volver a dibujar el
+  rectángulo desde la interfaz gráfica, que ajusta las coordenadas
+  automáticamente al tamaño real de la página.
+- **La interfaz web no encuentra la sesión ("Sesión no encontrada")** →
+  la sesión vive en memoria del proceso Flask; si se reinició el servidor
+  hay que volver a subir el PDF de ejemplo.
