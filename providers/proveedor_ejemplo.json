@@ -1,0 +1,25 @@
+{
+  "label": "Distribuidora Ejemplo S.A. (plantilla de ejemplo)",
+  "match": [
+    "DISTRIBUIDORA\\s+EJEMPLO",
+    "30-12345678-9"
+  ],
+  "fields": {
+    "numero_remito": {
+      "regex": ["Remito[^\\d]{0,12}([0-9][0-9\\-]{3,})"]
+    },
+    "fecha": {
+      "regex": ["Fecha\\s*:?\\s*(\\d{1,2}/\\d{1,2}/\\d{2,4})"]
+    },
+    "cliente": {
+      "regex": ["Sr\\.?\\(es\\)\\s*:?\\s*(.+)"]
+    },
+    "cantidad_bultos": {
+      "regex": ["Bultos\\s*:?\\s*(\\d+)"]
+    },
+    "numero_remito_sello": {
+      "bbox": [0.75, 0.03, 0.98, 0.1],
+      "page": 0
+    }
+  }
+}
