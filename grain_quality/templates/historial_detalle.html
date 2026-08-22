@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Trazabilidad #{{ calculation['calculation_id'] }}{% endblock %}
+{% block content %}
+<div class="tarjeta">
+  <h2>Trazabilidad del cálculo #{{ calculation['calculation_id'] }}</h2>
+  <p>
+    <strong>Producto:</strong> {{ calculation['product_name'] }}
+    {% if calculation['contract'] %} · <strong>Contrato:</strong> {{ calculation['contract'] }}{% endif %}
+    {% if calculation['ctg'] %} · <strong>CTG:</strong> {{ calculation['ctg'] }}{% endif %}
+    {% if calculation['weight_tn'] %} · <strong>Toneladas:</strong> {{ calculation['weight_tn'] }}{% endif %}
+  </p>
+  <p class="neutro">
+    Norma: {{ calculation['norm_reference'] }} · Versión {{ calculation['norm_version'] }}
+    · Fecha y hora del cálculo: {{ calculation['calculated_at'] }}
+  </p>
+  <table>
+    <thead><tr>
+      <th>Rubro</th><th>Planta</th><th>Cámara</th><th>Valor utilizado</th>
+      <th>Origen</th><th>Base</th><th>Regla aplicada</th><th>Tipo</th><th>Resultado</th>
+    </tr></thead>
+    <tbody>
+      {% for d in details %}
+      <tr>
+        <td>{{ d['rubro_name'] }}</td>
+        <td>{{ d['plant_value'] if d['plant_value'] is not none else '—' }}</td>
+        <td>{{ d['chamber_value'] if d['chamber_value'] is not none else '—' }}</td>
+        <td>{{ d['selected_value'] if d['selected_value'] is not none else '—' }}</td>
+        <td>{{ d['selected_source'] or 'Sin análisis' }}</td>
+        <td>{{ d['base'] if d['base'] is not none else '—' }}</td>
+        <td><small>{{ d['rule'] }}</small></td>
+        <td>{{ d['adjustment_type'] }}</td>
+        <td>{{ '%+.2f'|format(d['percentage']) }} %</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="totales">
+    <div class="total-caja"><div class="etiqueta">Bonificaciones</div>
+      <div class="valor bonif">+{{ '%.2f'|format(calculation['bonificacion']) }} %</div></div>
+    <div class="total-caja"><div class="etiqueta">Rebajas</div>
+      <div class="valor rebaja">-{{ '%.2f'|format(calculation['rebaja']) }} %</div></div>
+    <div class="total-caja"><div class="etiqueta">Neto</div>
+      <div class="valor {{ 'bonif' if calculation['neto'] >= 0 else 'rebaja' }}">
+        {{ '%+.2f'|format(calculation['neto']) }} %</div></div>
+    <div class="total-caja"><div class="etiqueta">Merma</div>
+      <div class="valor merma">{{ '%.2f'|format(calculation['merma']) }} %</div></div>
+  </div>
+  {% if calculation['warnings'] %}
+    <div class="advertencia">⚠️ {{ calculation['warnings'] }}</div>
+  {% endif %}
+</div>
+{% endblock %}

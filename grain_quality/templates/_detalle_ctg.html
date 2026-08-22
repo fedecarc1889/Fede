@@ -1,0 +1,47 @@
+{# Detalle de un CTGResult: tabla de rubros + totales. Espera variable `r`. #}
+<table>
+  <thead>
+    <tr>
+      <th>Rubro</th><th>Planta</th><th>Cámara</th>
+      <th>Valor utilizado</th><th>Origen</th>
+      <th>Base</th><th>Ajuste</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for rubro in r.rubros %}
+    <tr>
+      <td>{{ rubro.rubro_name }}</td>
+      <td>{{ rubro.plant_value if rubro.plant_value is not none else '—' }}</td>
+      <td>{{ rubro.chamber_value if rubro.chamber_value is not none else '—' }}</td>
+      <td>{{ rubro.selected_value if rubro.selected_value is not none else '—' }}</td>
+      <td><small class="origen">{{ rubro.selected_source.value if rubro.selected_source else 'Sin análisis' }}</small></td>
+      <td>{{ rubro.base if rubro.base is not none else '—' }}</td>
+      <td>
+        {% if rubro.adjustment_type.value == 'BONIFICACION' %}
+          <span class="bonif">+{{ '%.2f'|format(rubro.percentage) }} %</span>
+        {% elif rubro.adjustment_type.value == 'REBAJA' %}
+          <span class="rebaja">-{{ '%.2f'|format(rubro.percentage) }} %</span>
+        {% elif rubro.adjustment_type.value == 'MERMA' %}
+          <span class="merma">merma {{ '%.2f'|format(rubro.percentage) }} %</span>
+        {% elif rubro.adjustment_type.value == 'SIN_DATO' %}
+          <span class="neutro">sin dato</span>
+        {% else %}
+          <span class="neutro">0,00 %</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="totales">
+  <div class="total-caja"><div class="etiqueta">Bonificaciones</div>
+    <div class="valor bonif">+{{ '%.2f'|format(r.total_bonificacion) }} %</div></div>
+  <div class="total-caja"><div class="etiqueta">Rebajas</div>
+    <div class="valor rebaja">-{{ '%.2f'|format(r.total_rebaja) }} %</div></div>
+  <div class="total-caja"><div class="etiqueta">Resultado neto</div>
+    <div class="valor {{ 'bonif' if r.neto >= 0 else 'rebaja' }}">
+      {{ '%+.2f'|format(r.neto) }} %</div></div>
+  <div class="total-caja"><div class="etiqueta">Merma (separada)</div>
+    <div class="valor merma">{{ '%.2f'|format(r.total_merma) }} %</div></div>
+</div>
+{% for w in r.warnings %}<div class="advertencia">⚠️ {{ w }}</div>{% endfor %}

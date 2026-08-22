@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Historial · Calidad de Granos{% endblock %}
+{% block content %}
+<div class="tarjeta">
+  <h2>Historial de cálculos (trazabilidad)</h2>
+  {% if not calculations %}
+    <p class="neutro">Aún no hay cálculos guardados.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>#</th><th>Fecha</th><th>Contrato</th><th>CTG</th>
+      <th>Producto</th><th>Norma (versión)</th>
+      <th>Neto</th><th>Merma</th><th></th></tr></thead>
+    <tbody>
+      {% for c in calculations %}
+      <tr>
+        <td>{{ c['calculation_id'] }}</td>
+        <td>{{ c['calculated_at'] }}</td>
+        <td>{{ c['contract'] or '—' }}</td>
+        <td>{{ c['ctg'] or '—' }}</td>
+        <td>{{ c['product_name'] }}</td>
+        <td>{{ c['norm_reference'] }} (v{{ c['norm_version'] }})</td>
+        <td class="{{ 'bonif' if c['neto'] >= 0 else 'rebaja' }}">
+          {{ '%+.2f'|format(c['neto']) }} %</td>
+        <td class="merma">{{ '%.2f'|format(c['merma']) }} %</td>
+        <td><a href="{{ url_for('historial_detalle', calculation_id=c['calculation_id']) }}">ver</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

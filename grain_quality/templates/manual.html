@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Carga manual · Calidad de Granos{% endblock %}
+{% block content %}
+<div class="tarjeta">
+  <h2>Carga manual</h2>
+  <form method="get" action="{{ url_for('manual') }}">
+    <div class="campo">
+      <label for="producto">Producto</label>
+      <select name="producto" id="producto" onchange="this.form.submit()">
+        {% for p in products %}
+          <option value="{{ p.code }}" {% if p.code == selected %}selected{% endif %}>
+            {{ p.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <noscript><button type="submit">Cambiar producto</button></noscript>
+  </form>
+  <p class="neutro">
+    Norma aplicable: {{ norm.norm_reference }} (versión {{ norm.version }},
+    vigente desde {{ norm.valid_from }}).
+  </p>
+
+  <form method="post" action="{{ url_for('calcular') }}">
+    <input type="hidden" name="producto" value="{{ selected }}">
+    <div>
+      <div class="campo"><label>Contrato (opcional)</label>
+        <input type="text" name="contrato"></div>
+      <div class="campo"><label>CTG (opcional)</label>
+        <input type="text" name="ctg"></div>
+      <div class="campo"><label>Toneladas (opcional)</label>
+        <input type="text" name="toneladas" placeholder="30"></div>
+      <div class="campo"><label>Fecha análisis (opcional)</label>
+        <input type="date" name="fecha"></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Rubro</th><th>Unidad</th><th>Base</th>
+            <th>Valor Planta</th><th>Valor Cámara</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rubros %}
+        <tr>
+          <td>{{ r.name }}{% if r.required %} <strong>*</strong>{% endif %}</td>
+          <td>{{ r.unit }}</td>
+          <td>{{ r.calc.base if r.calc.base is defined else '—' }}</td>
+          <td><input type="text" inputmode="decimal"
+                     name="{{ r.code }}__planta" placeholder="ej. 14,2"></td>
+          <td><input type="text" inputmode="decimal"
+                     name="{{ r.code }}__camara" placeholder="ej. 13,8"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="neutro">* rubro obligatorio · Si un rubro tiene valor de Planta y de
+      Cámara, se utiliza el de <strong>Cámara</strong>. Un campo vacío significa
+      "sin análisis" (no es cero).</p>
+    <div class="campo" style="display:block">
+      <label>Observaciones (opcional)</label>
+      <textarea name="observaciones" rows="2" style="width:100%"></textarea>
+    </div>
+    <button type="submit">Calcular</button>
+  </form>
+</div>
+{% endblock %}
