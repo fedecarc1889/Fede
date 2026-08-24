@@ -10,6 +10,10 @@ Producto → rubros → regla por rubro → Cámara/Planta → valor válido
 → motor de cálculo → resultado por CTG → consolidación por contrato
 ```
 
+> **Versión Excel + VBA**: existe una implementación equivalente del SDD
+> como libro de Excel con macros, sin necesidad de Python. Ver
+> [`excel_vba/INSTRUCCIONES.md`](excel_vba/INSTRUCCIONES.md).
+
 ## Instalación
 
 ```bash
