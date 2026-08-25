@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Normas · Calidad de Granos{% endblock %}
+{% block content %}
+<div class="tarjeta">
+  <h2>Normas configuradas</h2>
+  <p class="neutro">
+    Las normas se definen en archivos JSON parametrizables
+    (<code>grain_quality/norms/</code>). Cada cambio de norma genera una
+    nueva versión con su vigencia; las versiones históricas nunca se
+    sobrescriben, lo que permite reproducir cálculos anteriores.
+  </p>
+  {% for producto in data %}
+  <h3>{{ producto.product }} ({{ producto.code }})</h3>
+  {% for v in producto.versions %}
+  <p>
+    <strong>{{ v.norm_reference }}</strong> — versión {{ v.version }} ·
+    vigencia {{ v.valid_from }} → {{ v.valid_to or 'sin límite' }} ·
+    {{ v.status or '' }}
+  </p>
+  <table>
+    <thead><tr><th>Rubro</th><th>Unidad</th><th>Obligatorio</th><th>Base</th>
+      <th>Tipo de cálculo</th><th>Regla</th></tr></thead>
+    <tbody>
+      {% for r in v.rubros %}
+      <tr>
+        <td>{{ r.name }}</td>
+        <td>{{ r.unit }}</td>
+        <td>{{ 'Sí' if r.required else 'No' }}</td>
+        <td>{{ r.calc.base if r.calc.base is defined else '—' }}</td>
+        <td>{{ r.calc.type }}</td>
+        <td><small>{{ r.calc.formula if r.calc.formula is defined else '' }}</small></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+  {% endfor %}
+</div>
+{% endblock %}

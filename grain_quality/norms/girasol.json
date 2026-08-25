@@ -1,0 +1,75 @@
+{
+  "product": {"code": "GIRASOL", "name": "Girasol"},
+  "versions": [
+    {
+      "version": "1",
+      "norm_reference": "Norma de calidad Girasol (parametrizada, ref. Norma XV)",
+      "valid_from": "2008-01-01",
+      "valid_to": null,
+      "status": "Activa",
+      "rubros": [
+        {
+          "code": "materia_grasa",
+          "name": "Materia grasa",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "bonificacion_rebaja_lineal",
+            "base": 42.0,
+            "bonif_factor": 2.0,
+            "rebaja_factor": 2.0,
+            "formula": "por cada punto sobre la base bonifica factor; por cada punto bajo la base rebaja factor"
+          }
+        },
+        {
+          "code": "humedad",
+          "name": "Humedad",
+          "unit": "%",
+          "required": true,
+          "min": 0,
+          "max": 45,
+          "calc": {
+            "type": "merma_por_exceso",
+            "base": 11.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "manipuleo": 0.25,
+            "formula": "merma = (valor - base) * factor + manipuleo, si valor > base"
+          }
+        },
+        {
+          "code": "cuerpos_extranos",
+          "name": "Cuerpos extraños",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 3.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        },
+        {
+          "code": "granos_danados",
+          "name": "Granos dañados",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 1.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        }
+      ]
+    }
+  ]
+}

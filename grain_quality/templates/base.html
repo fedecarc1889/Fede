@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Calidad de Granos{% endblock %}</title>
+  <style>
+    :root {
+      --verde: #2e7d32; --verde-claro: #e8f5e9; --rojo: #c62828;
+      --gris: #f5f5f5; --borde: #ddd; --texto: #222;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0;
+           color: var(--texto); background: #fafafa; }
+    header { background: var(--verde); color: #fff; padding: .8rem 1.5rem;
+             display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap; }
+    header h1 { font-size: 1.15rem; margin: 0; }
+    nav a { color: #dcedc8; text-decoration: none; margin-right: 1rem; }
+    nav a:hover { color: #fff; text-decoration: underline; }
+    main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+    table { border-collapse: collapse; width: 100%; background: #fff;
+            margin: .8rem 0; font-size: .92rem; }
+    th, td { border: 1px solid var(--borde); padding: .45rem .6rem; text-align: left; }
+    th { background: var(--gris); }
+    input, select, textarea { padding: .35rem .5rem; border: 1px solid #bbb;
+            border-radius: 4px; font-size: .95rem; }
+    input[type=number] { width: 7rem; }
+    button, .boton { background: var(--verde); color: #fff; border: none;
+            padding: .55rem 1.2rem; border-radius: 4px; font-size: 1rem;
+            cursor: pointer; text-decoration: none; display: inline-block; }
+    button:hover, .boton:hover { background: #1b5e20; }
+    .tarjeta { background: #fff; border: 1px solid var(--borde); border-radius: 6px;
+               padding: 1rem 1.2rem; margin-bottom: 1.2rem; }
+    .bonif { color: var(--verde); font-weight: 600; }
+    .rebaja { color: var(--rojo); font-weight: 600; }
+    .merma { color: #b26a00; font-weight: 600; }
+    .neutro { color: #777; }
+    .advertencia { background: #fff8e1; border: 1px solid #ffe082;
+                   padding: .5rem .8rem; border-radius: 4px; margin: .4rem 0; }
+    .error { background: #ffebee; border: 1px solid #ef9a9a;
+             padding: .5rem .8rem; border-radius: 4px; margin: .4rem 0; }
+    .totales { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: .8rem; }
+    .total-caja { background: var(--verde-claro); border-radius: 6px;
+                  padding: .7rem 1.2rem; min-width: 10rem; }
+    .total-caja .etiqueta { font-size: .8rem; color: #555; }
+    .total-caja .valor { font-size: 1.3rem; font-weight: 700; }
+    .campo { display: inline-block; margin: .3rem 1rem .3rem 0; }
+    .campo label { display: block; font-size: .8rem; color: #555; }
+    small.origen { color: #777; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>🌾 Calculadora de Calidad de Granos</h1>
+  <nav>
+    <a href="{{ url_for('manual') }}">Carga manual</a>
+    <a href="{{ url_for('importar_form') }}">Importar Excel</a>
+    <a href="{{ url_for('historial') }}">Historial</a>
+    <a href="{{ url_for('normas') }}">Normas</a>
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

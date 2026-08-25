@@ -1,0 +1,98 @@
+{
+  "product": {"code": "TRIGO", "name": "Trigo"},
+  "versions": [
+    {
+      "version": "1",
+      "norm_reference": "Norma de calidad Trigo (parametrizada, ref. Norma III)",
+      "valid_from": "2008-01-01",
+      "valid_to": null,
+      "status": "Activa",
+      "rubros": [
+        {
+          "code": "peso_hectolitrico",
+          "name": "Peso hectolítrico",
+          "unit": "kg/hl",
+          "required": false,
+          "min": 40,
+          "max": 100,
+          "calc": {
+            "type": "escala",
+            "base": 76.0,
+            "formula": "escala de bonificaciones/rebajas según kg/hl",
+            "ranges": [
+              {"from": 80.0, "to": null, "tipo": "BONIFICACION", "pct": 1.5},
+              {"from": 79.0, "to": 80.0, "tipo": "BONIFICACION", "pct": 1.0},
+              {"from": 78.0, "to": 79.0, "tipo": "BONIFICACION", "pct": 0.5},
+              {"from": 76.0, "to": 78.0, "tipo": "SIN_AJUSTE", "pct": 0.0},
+              {"from": 75.0, "to": 76.0, "tipo": "REBAJA", "pct": 0.5},
+              {"from": 74.0, "to": 75.0, "tipo": "REBAJA", "pct": 1.0},
+              {"from": 73.0, "to": 74.0, "tipo": "REBAJA", "pct": 1.5},
+              {"from": null, "to": 73.0, "tipo": "REBAJA", "pct": 2.0}
+            ]
+          }
+        },
+        {
+          "code": "humedad",
+          "name": "Humedad",
+          "unit": "%",
+          "required": true,
+          "min": 0,
+          "max": 45,
+          "calc": {
+            "type": "merma_por_exceso",
+            "base": 14.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "manipuleo": 0.25,
+            "formula": "merma = (valor - base) * factor + manipuleo, si valor > base"
+          }
+        },
+        {
+          "code": "materias_extranas",
+          "name": "Materias extrañas",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 1.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        },
+        {
+          "code": "granos_danados",
+          "name": "Granos dañados",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 1.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        },
+        {
+          "code": "granos_quebrados",
+          "name": "Granos quebrados y/o chuzos",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 2.0,
+            "tolerance": 0.0,
+            "factor": 0.5,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        }
+      ]
+    }
+  ]
+}

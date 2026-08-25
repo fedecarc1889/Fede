@@ -1,0 +1,75 @@
+{
+  "product": {"code": "SORGO", "name": "Sorgo"},
+  "versions": [
+    {
+      "version": "1",
+      "norm_reference": "Norma de calidad Sorgo (parametrizada, ref. Norma XIII)",
+      "valid_from": "2008-01-01",
+      "valid_to": null,
+      "status": "Activa",
+      "rubros": [
+        {
+          "code": "humedad",
+          "name": "Humedad",
+          "unit": "%",
+          "required": true,
+          "min": 0,
+          "max": 45,
+          "calc": {
+            "type": "merma_por_exceso",
+            "base": 15.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "manipuleo": 0.25,
+            "formula": "merma = (valor - base) * factor + manipuleo, si valor > base"
+          }
+        },
+        {
+          "code": "materias_extranas",
+          "name": "Materias extrañas",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 2.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        },
+        {
+          "code": "granos_danados",
+          "name": "Granos dañados",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 2.0,
+            "tolerance": 0.0,
+            "factor": 1.0,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        },
+        {
+          "code": "granos_quebrados",
+          "name": "Granos quebrados y/o partidos",
+          "unit": "%",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "calc": {
+            "type": "rebaja_por_exceso",
+            "base": 3.0,
+            "tolerance": 0.0,
+            "factor": 0.5,
+            "formula": "rebaja = (valor - base) * factor, si valor > base"
+          }
+        }
+      ]
+    }
+  ]
+}

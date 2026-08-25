@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Resultado · Calidad de Granos{% endblock %}
+{% block content %}
+<div class="tarjeta">
+  <h2>Resultado del cálculo</h2>
+  {% for e in input_errors %}<div class="error">{{ e }}</div>{% endfor %}
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% elif result %}
+    <p>
+      <strong>Producto:</strong> {{ result.product_name }}
+      {% if result.contract %} · <strong>Contrato:</strong> {{ result.contract }}{% endif %}
+      {% if result.ctg %} · <strong>CTG:</strong> {{ result.ctg }}{% endif %}
+      {% if result.weight_tn %} · <strong>Toneladas:</strong> {{ result.weight_tn }}{% endif %}
+    </p>
+    <p class="neutro">
+      Norma aplicada: {{ result.norm_reference }} (versión {{ result.norm_version }})
+      · Calculado: {{ result.calculated_at.strftime('%d/%m/%Y %H:%M:%S') }}
+      {% if calculation_id %} · Trazabilidad #{{ calculation_id }}{% endif %}
+    </p>
+    {% if observaciones %}<p><em>Observaciones: {{ observaciones }}</em></p>{% endif %}
+    {% with r = result %}{% include "_detalle_ctg.html" %}{% endwith %}
+  {% endif %}
+  <p style="margin-top:1.2rem">
+    <a class="boton" href="{{ url_for('manual') }}">Nuevo cálculo</a>
+    {% if calculation_id %}
+      <a class="boton" href="{{ url_for('historial_detalle', calculation_id=calculation_id) }}">
+        Ver trazabilidad</a>
+    {% endif %}
+  </p>
+</div>
+{% endblock %}
